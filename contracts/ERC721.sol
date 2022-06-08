@@ -14,14 +14,33 @@ contract MyNFT is ERC721URIStorage{
         contractAddress = marketPlaceAddress;
     }
 
-    function mintNFT(string memory tokenURI) public returns (uint)
+    struct NFTInfo{
+        uint256 royaltyFee;
+        address creator;
+    }
+
+    mapping(uint256 => NFTInfo) public nftInfo;
+
+    function mintNFT(string memory tokenURI, uint256 royalty) external returns (uint)
     {
+        require(royalty > 0, "royality should be between 0 to 10");
+        require(royalty < 10, "royality should less that 10");
         _tokenIds.increment();
         uint256 newItemId = _tokenIds.current();
-        
+        uint256 royaltyFee = royalty;
+
+        nftInfo[newItemId] = NFTInfo(
+            royaltyFee,
+            payable(msg.sender)
+        );
+
         _safeMint(msg.sender, newItemId);
         _setTokenURI(newItemId, tokenURI);
         setApprovalForAll(contractAddress, true);
         return newItemId;
+    }
+
+    function getRoyaltyInfo (uint256 _tokenId) public view returns (NFTInfo memory) {
+        return nftInfo[_tokenId];
     }
 }
