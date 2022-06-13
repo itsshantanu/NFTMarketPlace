@@ -1,12 +1,12 @@
 //SPDX-License-Identifier: MIT
 pragma solidity ^0.8.9;
 
-
 import "@openzeppelin/contracts/token/ERC721/extensions/ERC721URIStorage.sol";
 import "@openzeppelin/contracts/utils/Counters.sol";
+import "./interfaces/InterfaceRoyalty.sol";
 import "hardhat/console.sol";
 
-contract MyNFT is ERC721URIStorage{
+contract MyNFT is ERC721URIStorage, InterfaceGetRoyalty{
     using Counters for Counters.Counter;
     Counters.Counter private _tokenIds;
     address contractAddress; 
@@ -19,7 +19,7 @@ contract MyNFT is ERC721URIStorage{
         address creator;
     }
 
-    mapping(uint256 => NFTInfo) public nftInfo;
+    mapping(uint256 => NFTInfo) public nftInfos;
 
     function mintNFT(string memory tokenURI, uint256 royalty) external returns (uint)
     {
@@ -27,10 +27,9 @@ contract MyNFT is ERC721URIStorage{
         require(royalty < 10, "royality should less that 10");
         _tokenIds.increment();
         uint256 newItemId = _tokenIds.current();
-        uint256 royaltyFee = royalty;
 
-        nftInfo[newItemId] = NFTInfo(
-            royaltyFee,
+        nftInfos[newItemId] = NFTInfo(
+            royalty,
             payable(msg.sender)
         );
 
@@ -40,7 +39,8 @@ contract MyNFT is ERC721URIStorage{
         return newItemId;
     }
 
-    function getRoyaltyInfo (uint256 _tokenId) public view returns (NFTInfo memory) {
-        return nftInfo[_tokenId];
+    function royaltyInfo(uint256 _tokenId) external view override returns (uint256 royalty, address creator) {
+        NFTInfo memory nftInfo = nftInfos[_tokenId];
+        return (nftInfo.royaltyFee, nftInfo.creator);
     }
 }

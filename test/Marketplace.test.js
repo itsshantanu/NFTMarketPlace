@@ -29,12 +29,8 @@ describe("Marketplace", () =>{
       const nftAddress = nft.address;
       console.log(nftAddress);
 
-
       await nft.mintNFT('ABCD', 5);
       console.log("token Id is created with name ABCD");
-
-      await nftMarket.getRoyalty(nftAddress, 1);
-      console.log("Royalty fetched");
 
       await nftMarket.connect(owner).listNFTs(nftAddress, 1, 100);
       await nft.balanceOf(owner.address);

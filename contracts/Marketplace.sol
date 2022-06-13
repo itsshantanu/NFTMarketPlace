@@ -6,15 +6,8 @@ import "@openzeppelin/contracts/token/ERC20/IERC20.sol";
 import "@openzeppelin/contracts/token/ERC721/utils/ERC721Holder.sol";
 import "@openzeppelin/contracts/security/ReentrancyGuard.sol";
 import "@openzeppelin/contracts/utils/Counters.sol";
+import "./interfaces/InterfaceRoyalty.sol";
 
-interface GetRoyalty {
-    struct NFTInfo{
-        uint256 royaltyFee;
-        address creator;
-    }
-
-    function getRoyaltyInfo(uint256 _tokenId) external view returns (NFTInfo memory info);
-}
 
 contract NFTMarket is ReentrancyGuard, ERC721Holder{
     using Counters for Counters.Counter;
@@ -27,12 +20,6 @@ contract NFTMarket is ReentrancyGuard, ERC721Holder{
     constructor(address _tokenAddress) {
         owner = payable(msg.sender);
         tokenAddress = IERC20(_tokenAddress);
-    }
-
-    GetRoyalty.NFTInfo info;
-
-    function getRoyalty(address nftContractAddress, uint256 _tokenId) public {
-        info = GetRoyalty(nftContractAddress).getRoyaltyInfo(_tokenId);
     }
 
     struct NFTMarketItem{
@@ -73,13 +60,17 @@ contract NFTMarket is ReentrancyGuard, ERC721Holder{
             false
         );
 
+        NFTMarketItem memory nftMarketItem = marketItems[tokenId];
+
+        (uint256 royaltyFee, address creator) = getRoyalty(nftMarketItem.nftContract, tokenId);
+
         IERC721(nftContract).safeTransferFrom(msg.sender, address(this), tokenId);
 
         emit MarketItemCreated( 
             tokenId,
             price,
-            info.royaltyFee,
-            info.creator,
+            royaltyFee,
+            creator,
             nftContract, 
             address(0),
             msg.sender,
@@ -87,24 +78,29 @@ contract NFTMarket is ReentrancyGuard, ERC721Holder{
             );
     }
 
-
     function buyNFT(uint256 tokenId) external payable nonReentrant{
+        
+        NFTMarketItem memory nftMarketItem = marketItems[tokenId];
 
-        NFTMarketItem memory readItem = marketItems[tokenId];
+        (uint256 royaltyFee, address creator) = getRoyalty(nftMarketItem.nftContract, tokenId);
 
-        require(readItem.sold == false, "NFT is not up for sale");
-        require(msg.sender.balance >= readItem.price, "Account balance is less then the price of the NFT");
-        uint256 price = readItem.price;
-        uint256 royaltyFee = (price / 100) * info.royaltyFee;
+        require(nftMarketItem.sold == false, "NFT is not up for sale");
+        require(msg.sender.balance >= nftMarketItem.price, "Account balance is less then the price of the NFT");
+        uint256 price = nftMarketItem.price;
+        uint256 royaltyAmount = (price / 100) * royaltyFee;
         uint256 marketPlaceFee = price * platformFee / 1000;
         
-        tokenAddress.transferFrom(msg.sender, address(readItem.seller), price);
-        tokenAddress.transferFrom(msg.sender, address(info.creator), royaltyFee);
+        tokenAddress.transferFrom(msg.sender, address(nftMarketItem.seller), price);
+        tokenAddress.transferFrom(msg.sender, address(creator), royaltyAmount);
         tokenAddress.transferFrom(msg.sender, address(this), marketPlaceFee);
 
         marketItems[tokenId].owner = payable(msg.sender);
         marketItems[tokenId].sold = true;
            
         IERC721(marketItems[tokenId].nftContract).safeTransferFrom(address(this), msg.sender, tokenId);    
+    }
+
+    function getRoyalty(address nftContractAddress, uint256 _tokenId) internal view returns (uint256 _royalty, address _creator) {
+            return InterfaceGetRoyalty(nftContractAddress).royaltyInfo(_tokenId);     
     }
 }
